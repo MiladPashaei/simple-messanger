@@ -1,44 +1,124 @@
-import React from 'react'
-import AppStatus from './components/appStatus';
-import ListItem from './components/listItem';
-import List from './components/list';
-import ChatDetail from './components/chatDetail';
-import styles from './index.module.scss';
+import React, { useState, useMemo, useReducer } from "react";
+import AppStatus from "./components/appStatus";
+import ListItem from "./components/listItem";
+import List from "./components/list";
+import ChatDetail from "./components/chatDetail";
+import styles from "./index.module.scss";
+import { Server } from "../../Resourses/server";
+import { produce } from "immer";
+function reducer(state, action) {
+  switch (action.type) {
+    case "SELECTED_CHAT":
+      return { ...state, ...action.payload };
+    case "MESSAGE_ADDED":
+      const newMessage = {
+        id: Math.random().toString(),
+        me: true,
+        text: action.payload,
+        time: new Date(),
+        type: "txt",
+      };
+      const nextState = produce(state, (draftState) => {
+        const selectedItem = draftState.data.find(
+          (x) => x.id === draftState.selectedChat
+        );
 
+        selectedItem.messages.push(newMessage);
+      });
+
+      return nextState;
+    case "SEARCH_INPUT":
+      return { ...state, ...action.payload };
+    default:
+      return state;
+  }
+}
 export default function Index() {
-  return (
-    <div className={styles['layout']}>
-      <div className={styles['side']}>
-        <AppStatus />
-        <List>
-          <ListItem name='Maryam Habibi' avatar='/avatar-f.jpg' time='21:14' unreadMessageCount={65} text='Hi, This is a message' />
-          <ListItem name='Mina Mohammadi' avatar='/avatar-f.jpg' time='11:30' unreadMessageCount={15} text='Another Message' />
-          <ListItem name='Reza Ahmadi' avatar='/avatar.png' time='21:14' unreadMessageCount={65} text='Hi, This is a message' />
-          <ListItem name='Afshin Karimi' avatar='/avatar.png' time='11:30' unreadMessageCount={15} text='Another Message' selected />
-          <ListItem name='Mohammad Mardan Nia' avatar='/avatar.png' time='21:14' unreadMessageCount={65} text='Hi, This is a message' />
-          <ListItem name='Sarah Kiani' avatar='/avatar-f.jpg' time='11:30' unreadMessageCount={15} text='Another Message' />
-          <ListItem name='Minoo Mohammadian' avatar='/avatar-f.jpg' time='21:14' unreadMessageCount={65} text='Hi, This is a message' />
-          <ListItem name='Fereydoon Sabet' avatar='/avatar.png' time='11:30' unreadMessageCount={15} text='Another Message' />
-          <ListItem name='Zahra Gholami' avatar='/avatar-f.jpg' time='21:14' unreadMessageCount={65} text='Hi, This is a message' />
-          <ListItem name='Mohammad Bayat' avatar='/avatar.png' time='11:30' unreadMessageCount={15} text='Another Message' />
-        </List>
+  const [{ data, selectedChat, keyword }, dispatch] = useReducer(reducer, {
+    data: Server,
+    selectChat: 1,
+    keyword: "",
+  });
 
-      </div>
-      <div className={styles['main']}>
+  function selectChatHandler(id) {
+    dispatch({
+      type: "SELECTED_CHAT",
+      payload: { selectedChat: id },
+    });
+  }
+  function searchHandler(keyword) {
+    dispatch({
+      type: "SEARCH_INPUT",
+      payload: { keyword: keyword },
+    });
+  }
+  function addMessageHandler(text) {
+    dispatch({
+      type: "MESSAGE_ADDED",
+      payload: text,
+    });
+  }
+
+  const ShowList = useMemo(() => {
+    return data.filter((x) =>
+      x.name.toLowerCase().includes(keyword.toLowerCase())
+    );
+  }, [keyword, data]);
+
+  function chatGenerator(data) {
+    const getTime = (item) => {
+      const lastIndex = item.messages.length - 1;
+      const time = item.messages[lastIndex].time;
+
+      return `${time.getHours()}:${time.getMinutes()}`;
+    };
+    const getText = (item) => {
+      const lastIndex = item.messages.length - 1;
+      return item.messages[lastIndex].text.substring(0, 10) + "...";
+    };
+    return (
+      <List>
+        {data.map((item) => {
+          return (
+            <ListItem
+              id={item.id}
+              key={item.id}
+              name={item.name}
+              avatar={item.avatar}
+              unreadMessageCount={item.unreadMessageCount}
+              time={getTime(item)}
+              text={getText(item)}
+              selectChat={selectChatHandler}
+            />
+          );
+        })}
+      </List>
+    );
+  }
+  function chatDetailGenerator() {
+    const selectedItem = data.find((x) => x.id === selectedChat);
+
+    if (selectedItem === undefined) {
+      return <div>Please select An Chat</div>;
+    } else
+      return (
         <ChatDetail
-          avatar='/avatar.png'
-          name='Afshin Karimi'
-          messages={
-            [
-              { id: '1', me: false, text: "It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using 'Content here, content here'" },
-              { id: '2', me: true, text: "A single line message." },
-              { id: '3', me: false, text: "ontrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin literature from 45 BC, making it over 2000 years old. Richard McClintock, a Latin professor at Hampden-Sydney College in Virginia, looked up one of the more obscure Latin words" },
-              { id: '4', me: false, text: "There are many variations of passages of Lorem Ipsum available, but the majority have suffered alteration in some form, by injected humour, or randomised words which don't look even slightly believable. " },
-              { id: '5', me: true, text: "It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using 'Content here, content here'" },
-            ]
-          }
+          addMessage={addMessageHandler}
+          selectChat={selectChatHandler}
+          avatar={selectedItem.avatar}
+          name={selectedItem.name}
+          messages={selectedItem.messages}
         />
+      );
+  }
+
+  return (
+    <div className={styles["layout"]}>
+      <div className={styles["side"]}>
+        <AppStatus keyword={keyword} searchInput={searchHandler} />
+        {chatGenerator(ShowList)}
       </div>
+      <div className={styles["main"]}>{chatDetailGenerator()}</div>
     </div>
-  )
+  );
 }
